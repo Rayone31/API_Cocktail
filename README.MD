@@ -7,3 +7,4 @@ LAGHALID Nohaeila
 DAMIENS Giovanni
 MOLINA Florian
 
+pour lancer l'API : node server.js
