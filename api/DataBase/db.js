@@ -67,7 +67,7 @@ db.serialize(() => {
     if (err) {
       console.error('Erreur lors de la vérification des messages :', err.message);
     } else if (row.count === 0) {
-      db.run('INSERT INTO messages (content) VALUES (?)', ['Hello from SQLite!']);
+      db.run('INSERT INTO messages (content) VALUES (?)', ["Media'ktail"]);
     }
   });
 
