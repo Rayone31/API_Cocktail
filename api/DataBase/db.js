@@ -21,7 +21,8 @@ db.serialize(() => {
       Id INTEGER PRIMARY KEY AUTOINCREMENT,
       Name TEXT NOT NULL,
       Password TEXT NOT NULL,
-      Email TEXT NOT NULL UNIQUE
+      Email TEXT NOT NULL UNIQUE,
+      Grade TEXT NOT NULL
     )
   `);
 
@@ -75,12 +76,11 @@ db.serialize(() => {
     if (err) {
       console.error('Erreur lors de la vérification des utilisateurs :', err.message);
     } else if (row.count === 0) {
-      const hashedPassword = await bcrypt.hash('password123', 10);
-      db.run('INSERT INTO user (name, password, email) VALUES (?, ?, ?)', ['Test User', hashedPassword, 'test@example.com']);
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      db.run('INSERT INTO user (name, password, email, grade) VALUES (?, ?, ?, ?)', ['admin', hashedPassword, 'admin@example.com', 'admin']);
     }
   });
 
 });
-
 
 module.exports = db;
