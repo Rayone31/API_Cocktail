@@ -30,30 +30,32 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS cocktail (
       Id_Cocktail INTEGER PRIMARY KEY AUTOINCREMENT,
       Name_Cocktail TEXT NOT NULL,
-      ID_Recipe INTEGER NOT NULL,
       Categorie TEXT NOT NULL,
-      Id_Ingredient INTEGER NOT NULL,
       Origine TEXT NOT NULL,
       Image TEXT NOT NULL,
       Statut TEXT NOT NULL,
-      Note INTEGER NOT NULL,
-      Name_Creator TEXT NOT NULL,
-      Id_User INTEGER NOT NULL
+      Favori INTEGER DEFAULT 0,
+      Id_User INTEGER NOT NULL,
+      FOREIGN KEY (Id_User) REFERENCES user(Id)
     )
   `);
 
   db.run(`
     CREATE TABLE IF NOT EXISTS recipe (
       Id_Recipe INTEGER PRIMARY KEY AUTOINCREMENT,
+      Id_Cocktail INTEGER NOT NULL,
       Etape TEXT NOT NULL,
-      Equipement TEXT NOT NULL
+      Equipement TEXT NOT NULL,
+      FOREIGN KEY (Id_Cocktail) REFERENCES cocktail(Id_Cocktail)
     )
   `);
 
   db.run(`
     CREATE TABLE IF NOT EXISTS ingredient (
       Id_Ingredient INTEGER PRIMARY KEY AUTOINCREMENT,
-      Liste_Ingredient TEXT NOT NULL
+      Id_Cocktail INTEGER NOT NULL,
+      Liste_Ingredient TEXT NOT NULL,
+      FOREIGN KEY (Id_Cocktail) REFERENCES cocktail(Id_Cocktail)
     )
   `);
 

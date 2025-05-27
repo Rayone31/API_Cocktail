@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 const app = express();
 const port = 3001;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -80,70 +79,69 @@ app.post('/api/login', (req, res) => {
       token,
       userId: user.Id,
       name: user.Name,
+      email: user.Email,
       grade: user.Grade,
     });
   });
 });
 
+// Endpoint pour ajouter un cocktail
 app.post('/api/cocktails', (req, res) => {
-  console.log('Données reçues :', req.body);
-
   const {
     name,
-    recipe,
     category,
-    ingredient,
     origin,
-    image, 
-    status, 
-    note, 
-    creatorName,
-    userId, 
+    image,
+    userId,
+    ingredients,
+    recipes
   } = req.body;
 
-  if (!name) console.log('Champ vide : name');
-  if (!recipe) console.log('Champ vide : recipe');
-  if (!category) console.log('Champ vide : category');
-  if (!ingredient) console.log('Champ vide : ingredient');
-  if (!origin) console.log('Champ vide : origin');
-  if (!image) console.log('Champ vide : image');
-  if (!status) console.log('Champ vide : status');
-  if (!note) console.log('Champ vide : note');
-  if (!creatorName) console.log('Champ vide : creatorName');
-  if (!userId) console.log('Champ vide : userId');
-
+  // Statut et favori fixés côté serveur
+  const status = 'à Vérifier';
+  const favori = 0;
 
   if (
-    !name ||
-    !recipe ||
-    !category ||
-    !ingredient ||
-    !origin ||
-    !image ||
-    !status ||
-    !note ||
-    !creatorName ||
-    !userId
+    !name || !category || !origin || !image ||
+    !userId ||
+    !Array.isArray(ingredients) || !Array.isArray(recipes)
   ) {
     return res.status(400).json({ error: 'Tous les champs sont requis' });
   }
 
   db.run(
-    `INSERT INTO cocktail 
-      (Name_Cocktail, ID_Recipe, Categorie, Id_Ingredient, Origine, Image, Statut, Note, Name_Creator, Id_User) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, recipe, category, ingredient, origin, image, status, note, creatorName, userId],
+    `INSERT INTO cocktail (Name_Cocktail, Categorie, Origine, Image, Statut, Favori, Id_User)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [name, category, origin, image, status, favori, userId],
     function (err) {
       if (err) {
         console.error('Erreur lors de l\'ajout du cocktail :', err.message);
         return res.status(500).json({ error: 'Erreur lors de l\'ajout du cocktail' });
-      } else {
-        res.status(201).json({ message: 'Cocktail ajouté avec succès', cocktailId: this.lastID });
       }
+      const cocktailId = this.lastID;
+
+      // Insertion des ingrédients
+      ingredients.forEach(ing => {
+        db.run(
+          `INSERT INTO ingredient (Id_Cocktail, Liste_Ingredient) VALUES (?, ?)`,
+          [cocktailId, ing.liste_ingredient]
+        );
+      });
+
+      // Insertion des étapes de recette
+      recipes.forEach(rec => {
+        db.run(
+          `INSERT INTO recipe (Id_Cocktail, Etape, Equipement) VALUES (?, ?, ?)`,
+          [cocktailId, rec.etape, rec.equipement]
+        );
+      });
+
+      res.status(201).json({ message: 'Cocktail ajouté avec succès', cocktailId });
     }
   );
 });
 
+// Endpoint pour récupérer tous les cocktails
 app.get('/api/cocktails', (req, res) => {
   db.all('SELECT * FROM cocktail', (err, rows) => {
     if (err) {
@@ -155,16 +153,115 @@ app.get('/api/cocktails', (req, res) => {
   });
 });
 
+// Endpoint pour récupérer un cocktail par ID
 app.get('/api/cocktails/:id', (req, res) => {
   const { id } = req.params;
-  db.get('SELECT * FROM cocktail WHERE Id_Cocktail = ?', [id], (err, row) => {
+  db.get('SELECT * FROM cocktail WHERE Id_Cocktail = ?', [id], (err, cocktail) => {
     if (err) {
-      console.error('Erreur lors de la récupération du cocktail :', err.message);
-      res.status(500).json({ error: 'Erreur lors de la récupération du cocktail' });
-    } else if (!row) {
-      res.status(404).json({ error: 'Cocktail non trouvé' });
+      return res.status(500).json({ error: 'Erreur lors de la récupération du cocktail' });
+    }
+    if (!cocktail) {
+      return res.status(404).json({ error: 'Cocktail non trouvé' });
+    }
+
+    db.all('SELECT * FROM ingredient WHERE Id_Cocktail = ?', [id], (err, ingredients) => {
+      if (err) {
+        return res.status(500).json({ error: 'Erreur lors de la récupération des ingrédients' });
+      }
+      db.all('SELECT * FROM recipe WHERE Id_Cocktail = ?', [id], (err, recipes) => {
+        if (err) {
+          return res.status(500).json({ error: 'Erreur lors de la récupération des étapes' });
+        }
+        res.json({
+          ...cocktail,
+          ingredients,
+          recipes
+        });
+      });
+    });
+  });
+});
+
+// Endpoint pour mettre à jour le statut d'un cocktail
+app.put('/api/cocktails/:id', (req, res) => {
+  const { id } = req.params;
+  const { Statut } = req.body;
+
+  if (!Statut) {
+    return res.status(400).json({ error: 'Le statut est requis' });
+  }
+
+  db.run(
+    'UPDATE cocktail SET Statut = ? WHERE Id_Cocktail = ?',
+    [Statut, id],
+    function (err) {
+      if (err) {
+        console.error('Erreur lors de la mise à jour du statut du cocktail :', err.message);
+        return res.status(500).json({ error: 'Erreur lors de la mise à jour du statut du cocktail' });
+      } else if (this.changes === 0) {
+        return res.status(404).json({ error: 'Cocktail non trouvé' });
+      } else {
+        res.json({ message: 'Statut du cocktail mis à jour avec succès' });
+      }
+    }
+  );
+});
+
+// Endpoint pour supprimer un cocktail
+app.delete('/api/cocktails/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.run('DELETE FROM cocktail WHERE Id_Cocktail = ?', [id], function (err) {
+    if (err) {
+      console.error('Erreur lors de la suppression du cocktail :', err.message);
+      return res.status(500).json({ error: 'Erreur lors de la suppression du cocktail' });
+    } else if (this.changes === 0) {
+      return res.status(404).json({ error: 'Cocktail non trouvé' });
     } else {
-      res.json(row);
+      res.json({ message: 'Cocktail supprimé avec succès' });
+    }
+  });
+});
+
+// Endpoint pour récupérer tous les utilisateurs
+app.get('/api/users', (req, res) => {
+  db.all('SELECT * FROM user', (err, rows) => {
+    if (err) {
+      console.error('Erreur lors de la récupération des utilisateurs :', err.message);
+      res.status(500).json({ error: 'Erreur lors de la récupération des utilisateurs' });
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+// Endpoint pour supprimer un utilisateur
+app.delete('/api/users/:id', (req, res) => {
+  const { id } = req.params;
+
+  db.run('DELETE FROM user WHERE Id = ?', [id], function (err) {
+    if (err) {
+      console.error('Erreur lors de la suppression de l\'utilisateur :', err.message);
+      return res.status(500).json({ error: 'Erreur lors de la suppression de l\'utilisateur' });
+    } else if (this.changes === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    } else {
+      res.json({ message: 'Utilisateur supprimé avec succès', userId: id });
+    }
+  });
+});
+
+app.get('/api/users/:id/cocktails', (req, res) => {
+  const { id } = req.params;
+  console.log(`ID utilisateur reçu : ${id}`);
+
+  db.all('SELECT * FROM cocktail WHERE Id_User = ?', [id], (err, rows) => {
+    if (err) {
+      console.error('Erreur lors de la récupération des cocktails :', err.message);
+      res.status(500).json({ error: 'Erreur lors de la récupération des cocktails' });
+    } else {
+      console.log('Cocktails trouvés :', rows);
+      res.json(rows);
     }
   });
 });
