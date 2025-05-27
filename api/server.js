@@ -97,9 +97,9 @@ app.post('/api/cocktails', (req, res) => {
     recipes
   } = req.body;
 
-  // Statut et favori fixés côté serveur
+  // Statut et Note fixés côté serveur
   const status = 'à Vérifier';
-  const favori = 0;
+  const note = 0;
 
   if (
     !name || !category || !origin || !image ||
@@ -110,9 +110,9 @@ app.post('/api/cocktails', (req, res) => {
   }
 
   db.run(
-    `INSERT INTO cocktail (Name_Cocktail, Categorie, Origine, Image, Statut, Favori, Id_User)
+    `INSERT INTO cocktail (Name_Cocktail, Categorie, Origine, Image, Statut, Note, Id_User)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [name, category, origin, image, status, favori, userId],
+    [name, category, origin, image, status, note, userId],
     function (err) {
       if (err) {
         console.error('Erreur lors de l\'ajout du cocktail :', err.message);
@@ -264,6 +264,90 @@ app.get('/api/users/:id/cocktails', (req, res) => {
       res.json(rows);
     }
   });
+});
+
+// Endpoint pour ajouter ou mettre à jour une note sur un cocktail
+app.post('/api/reviews', (req, res) => {
+  const { userId, cocktailId, note } = req.body;
+  console.log(`Nouvelle requête /api/reviews : userId=${userId}, cocktailId=${cocktailId}, note=${note}`);
+
+  if (
+    typeof userId !== 'number' ||
+    typeof cocktailId !== 'number' ||
+    typeof note !== 'number' ||
+    note < 0 || note > 5
+  ) {
+    return res.status(400).json({ error: 'Paramètres invalides' });
+  }
+
+  // On essaye d'insérer, ou de mettre à jour si déjà existant
+  db.run(
+    `INSERT INTO review (Id_User, Id_Cocktail, Note)
+     VALUES (?, ?, ?)
+     ON CONFLICT(Id_User, Id_Cocktail) DO UPDATE SET Note=excluded.Note`,
+    [userId, cocktailId, note],
+    function (err) {
+      if (err) {
+        console.error('Erreur lors de l\'ajout/mise à jour de la note :', err.message);
+        return res.status(500).json({ error: 'Erreur lors de l\'ajout/mise à jour de la note' });
+      }
+      // Mettre à jour la moyenne dans la table cocktail
+      db.get(
+        'SELECT AVG(Note) as average FROM review WHERE Id_Cocktail = ?',
+        [cocktailId],
+        (err, row) => {
+          if (err) {
+            console.error('Erreur lors du calcul de la moyenne :', err.message);
+            return res.status(500).json({ error: 'Erreur lors du calcul de la moyenne' });
+          }
+          const moyenne = row && row.average ? Number(row.average).toFixed(2) : 0;
+          db.run(
+            'UPDATE cocktail SET Note = ? WHERE Id_Cocktail = ?',
+            [moyenne, cocktailId],
+            (err) => {
+              if (err) {
+                console.error('Erreur lors de la mise à jour de la note du cocktail :', err.message);
+                return res.status(500).json({ error: 'Erreur lors de la mise à jour de la note du cocktail' });
+              }
+              res.status(201).json({ message: 'Note enregistrée avec succès' });
+            }
+          );
+        }
+      );
+    }
+  );
+});
+
+// Endpoint pour récupérer la moyenne des notes d'un cocktail
+app.get('/api/cocktails/:id/average', (req, res) => {
+  const { id } = req.params;
+  db.get(
+    'SELECT AVG(Note) as average FROM review WHERE Id_Cocktail = ?',
+    [id],
+    (err, row) => {
+      if (err) {
+        console.error('Erreur lors de la récupération de la moyenne :', err.message);
+        return res.status(500).json({ error: 'Erreur lors de la récupération de la moyenne' });
+      }
+      res.json({ average: row.average ? Number(row.average).toFixed(2) : null });
+    }
+  );
+});
+
+// Endpoint pour récupérer la note d'un utilisateur sur un cocktail
+app.get('/api/reviews/:userId/:cocktailId', (req, res) => {
+  const { userId, cocktailId } = req.params;
+  db.get(
+    'SELECT Note FROM review WHERE Id_User = ? AND Id_Cocktail = ?',
+    [userId, cocktailId],
+    (err, row) => {
+      if (err) {
+        console.error('Erreur lors de la récupération de la note :', err.message);
+        return res.status(500).json({ error: 'Erreur lors de la récupération de la note' });
+      }
+      res.json({ note: row ? row.Note : null });
+    }
+  );
 });
 
 // Démarrer le serveur

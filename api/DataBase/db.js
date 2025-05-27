@@ -34,9 +34,21 @@ db.serialize(() => {
       Origine TEXT NOT NULL,
       Image TEXT NOT NULL,
       Statut TEXT NOT NULL,
-      Favori INTEGER DEFAULT 0,
+      Note INTEGER DEFAULT 0,
       Id_User INTEGER NOT NULL,
       FOREIGN KEY (Id_User) REFERENCES user(Id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS review (
+      Id_Review INTEGER PRIMARY KEY AUTOINCREMENT,
+      Id_User INTEGER NOT NULL,
+      Id_Cocktail INTEGER NOT NULL,
+      Note INTEGER NOT NULL CHECK(Note >= 0 AND Note <= 5),
+      FOREIGN KEY (Id_User) REFERENCES user(Id),
+      FOREIGN KEY (Id_Cocktail) REFERENCES cocktail(Id_Cocktail),
+      UNIQUE (Id_User, Id_Cocktail)
     )
   `);
 
@@ -49,6 +61,7 @@ db.serialize(() => {
       FOREIGN KEY (Id_Cocktail) REFERENCES cocktail(Id_Cocktail)
     )
   `);
+
 
   db.run(`
     CREATE TABLE IF NOT EXISTS ingredient (
